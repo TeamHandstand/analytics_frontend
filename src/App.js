@@ -86,7 +86,7 @@ function App() {
       width: "100%"
     },
     teamImage: {
-      width: "10px",
+      width: "30px",
       height: "auto"
     },
     modal: {
