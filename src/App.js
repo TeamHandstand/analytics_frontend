@@ -17,7 +17,8 @@ import {
   Modal,
   IconButton
 } from "@material-ui/core";
-
+import { createMuiTheme, ThemeProvider } from "@material-ui/core/styles";
+import { defaultTheme } from "./defaultTheme";
 import PlayCircleOutlineIcon from "@material-ui/icons/PlayCircleOutline";
 
 function App() {
@@ -30,15 +31,17 @@ function App() {
   const [eventId, setEventId] = React.useState("");
   const [selectedRiddleId, setSelectedRiddleId] = React.useState("");
   const [badgeRiddles, setBadgeRiddles] = React.useState([]);
+  const [teams, setTeams] = React.useState([]);
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSubmissionLoading, setIsSubmissionLoading] = React.useState(false);
   const [isMatchupLoading, setIsMatchupLoading] = React.useState(false);
+  const [isTeamLoading, setIsTeamLoading] = React.useState(false);
 
   const [modalOpen, setModalOpen] = React.useState(false);
   const [mediaUrl, setMediaUrl] = React.useState("");
-  React.useEffect(() => {});
-  const theme = useTheme();
+  const theme = createMuiTheme(defaultTheme);
+
   const useStyles = makeStyles({
     container: {
       backgroundColor: "black",
@@ -48,21 +51,43 @@ function App() {
     paper: {
       padding: "16px"
     },
-    header: {},
-    overview: {},
+    header: {
+      display: "flex",
+      alignContent: "center",
+      marginBottom: "8px"
+    },
+    overview: {
+      display: "flex",
+      justifyContent: "space-evenly"
+    },
     submissionHeader: {
       display: "flex",
       justifyContent: "space-between"
     },
-    submissionOverview: {
-      backgroundColor: "#EFEFEF"
-    },
     table: {},
     badgeInfo: {
-      cursor: "pointer"
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      width: "18%",
+      padding: "4px"
     },
     selectedBadge: {
       backgroundColor: "pink"
+    },
+    icon: {
+      width: "40px",
+      height: "auto"
+    },
+    textContainer: {
+      display: "flex",
+      justifyContent: "space-between",
+      width: "100%"
+    },
+    teamImage: {
+      width: "10px",
+      height: "auto"
     },
     modal: {
       position: "absolute",
@@ -85,10 +110,10 @@ function App() {
     setEventId(e.target.value);
   };
 
-  const fetchDataForEventId = async () => {
+  const fetchDataForEventId = () => {
     const url = `https://api.handstandwith.us/v2/events/${eventId}/event_badges`;
     setIsLoading(true);
-    await fetch(proxyUrl + url, {
+    fetch(proxyUrl + url, {
       headers
     })
       .then(response => response.json())
@@ -99,6 +124,7 @@ function App() {
           )[0];
           if (votableRiddle) {
             return {
+              name: badge.name,
               image: badge.imageUrl,
               riddle: votableRiddle
             };
@@ -114,10 +140,11 @@ function App() {
           })
             .then(res => res.json())
             .then(json => {
-              const total = json.submissions.reduce(
-                (acc, c) => acc + c.numScoredMatchups,
-                0
-              )/2;
+              const total =
+                json.submissions.reduce(
+                  (acc, c) => acc + c.numScoredMatchups,
+                  0
+                ) / 2;
 
               const average = (total / json.submissions.length).toFixed(1);
               mappedBadges[badge] = {
@@ -145,7 +172,6 @@ function App() {
             });
         }
 
-        console.log("BR", mappedBadges);
         setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
         setIsLoading(false);
       })
@@ -155,7 +181,9 @@ function App() {
       });
   };
 
-  const handleEventIdButtonClick = e => {
+  const handleEventIdButtonClick = () => {
+    setSelectedRiddleId("");
+    fetchTeamInfoForEventId();
     fetchDataForEventId();
   };
 
@@ -200,9 +228,26 @@ function App() {
       });
   };
 
-  const handleRefreshClick = async () => {
-    await fetchDataForEventId(eventId);
-    fetchMatchupsForRiddleId(selectedRiddleId);
+  const fetchTeamInfoForEventId = () => {
+    setIsTeamLoading(true);
+    const url = `https://api.handstandwith.us/v2/events/${eventId}/teams`;
+    setIsMatchupLoading(true);
+    fetch(proxyUrl + url, {
+      headers
+    })
+      .then(res => res.json())
+      .then(json => {
+        setTeams(json.teams);
+        setIsTeamLoading(false);
+      })
+      .catch(err => {
+        setIsTeamLoading(false);
+        console.log("Error fetching team data:", err);
+      });
+  };
+
+  const handleRefreshClick = () => {
+    handleEventIdButtonClick();
   };
 
   const handlePlayIconClick = mediaUrl => {
@@ -215,162 +260,165 @@ function App() {
       handleEventIdButtonClick();
     }
   };
+
   return (
-    <div className={classes.container}>
-      <Paper className={classes.paper}>
-        <Grid container>
-          <Grid item xs={12} className={classes.header}>
-            <TextField
-              variant="outlined"
-              onChange={handleEventIdChange}
-              onKeyDown={handleKeyDown}
-              value={eventId}
-            />
-            <Button
-              type={"success"}
-              variant="outlined"
-              onClick={handleEventIdButtonClick}
-            >
-              Go
-            </Button>
-          </Grid>
-          {!isLoading && (
-            <Grid item xs={12} className={classes.overview}>
+    <ThemeProvider theme={theme}>
+      <div className={classes.container}>
+        <Paper className={classes.paper}>
+          <Grid container>
+            <Grid item xs={12} className={classes.header}>
+              <TextField
+                variant="outlined"
+                onChange={handleEventIdChange}
+                onKeyDown={handleKeyDown}
+                value={eventId}
+                label={"Event ID or Slug"}
+              />
+              <Button variant="outlined" onClick={handleEventIdButtonClick}>
+                {isLoading ? <CircularProgress size={20} /> : "Go"}
+              </Button>
+              <Button variant="outlined" onClick={handleRefreshClick}>
+                {isLoading ? <CircularProgress size={20} /> : "Refresh"}
+              </Button>
+            </Grid>
+            {!isLoading && (
+              <Grid item xs={12}>
+                <Grid container className={classes.overview}>
+                  {badgeRiddles.map(br => {
+                    return (
+                      <Grid
+                        item
+                        className={`${classes.badgeInfo} ${br?.riddle?.id ===
+                          selectedRiddleId && classes.selectedBadge}`}
+                        onClick={() => {
+                          handleBadgeClick(br?.riddle?.id);
+                        }}
+                      >
+                        <img className={classes.icon} src={br.image} />
+                        <Typography>{br.name}</Typography>
+                        <div className={classes.textContainer}>
+                          <Typography># Subs: </Typography>
+                          {isSubmissionLoading ? (
+                            <CircularProgress size={10} />
+                          ) : (
+                            <Typography>{br.submissionTotal}</Typography>
+                          )}
+                        </div>
+                        <div className={classes.textContainer}>
+                          <Typography># Votes: </Typography>
+                          {isSubmissionLoading ? (
+                            <CircularProgress size={10} />
+                          ) : (
+                            <Typography>{br.voteTotal}</Typography>
+                          )}
+                        </div>
+                        <div className={classes.textContainer}>
+                          <Typography>Avg Matchup: </Typography>
+                          {isSubmissionLoading ? (
+                            <CircularProgress size={10} />
+                          ) : (
+                            <Typography>{br.averageNumMatchups}</Typography>
+                          )}
+                        </div>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Grid>
+            )}
+            {!isLoading && badgeRiddles.length > 0 && selectedRiddleId && (
               <Grid container>
-                {badgeRiddles.map(br => {
-                  return (
-                    <Grid
-                      item
-                      className={`${classes.badgeInfo} ${br?.riddle?.id ===
-                        selectedRiddleId && classes.selectedBadge}`}
-                      onClick={() => {
-                        handleBadgeClick(br?.riddle?.id);
-                      }}
-                    >
-                      <img src={br.image} />
-                      <Typography>
-                        # Subs:{" "}
-                        {isSubmissionLoading ? (
-                          <CircularProgress size={10} />
-                        ) : (
-                          br.submissionTotal
-                        )}
-                      </Typography>
-                      <Typography>
-                        # Votes:{" "}
-                        {isSubmissionLoading ? (
-                          <CircularProgress size={10} />
-                        ) : (
-                          br.voteTotal
-                        )}
-                      </Typography>
-                      <Typography>
-                        Avg Matchup:{" "}
-                        {isSubmissionLoading ? (
-                          <CircularProgress size={10} />
-                        ) : (
-                          br.averageNumMatchups
-                        )}
-                      </Typography>
-                    </Grid>
-                  );
-                })}
+                <Grid item xs={12} className={classes.submissionHeader}>
+                  <Typography variant={"h4"}>Submissions</Typography>
+                </Grid>
+                <Grid item xs={12} className={classes.table}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Ranking</TableCell>
+                        <TableCell>Team Name</TableCell>
+                        <TableCell>Team Image</TableCell>
+                        <TableCell>Elo Rating</TableCell>
+                        <TableCell>Media URL</TableCell>
+                        <TableCell>Wins</TableCell>
+                        <TableCell>Losses</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {badgeRiddles
+                        .find(br => br.riddle.id === selectedRiddleId)
+                        ?.submissions?.map((submission, index) => {
+                          return (
+                            <TableRow>
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell>
+                                {
+                                  teams?.find(
+                                    team =>
+                                      team.id === submission.solvedRiddle.teamId
+                                  )?.name
+                                }
+                              </TableCell>
+                              <TableCell>
+                                <img
+                                  className={classes.teamImage}
+                                  src={
+                                    teams?.find(
+                                      team =>
+                                        team.id ===
+                                        submission.solvedRiddle.teamId
+                                    )?.imageUrl
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>{submission.eloScore}</TableCell>
+                              <TableCell>
+                                <IconButton
+                                  onClick={() => {
+                                    handlePlayIconClick(
+                                      submission.solvedRiddle.mediaUrl
+                                    );
+                                  }}
+                                >
+                                  <PlayCircleOutlineIcon />
+                                </IconButton>
+                              </TableCell>
+                              <TableCell>
+                                {isMatchupLoading ? (
+                                  <CircularProgress size={10} />
+                                ) : (
+                                  submission.wins
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isMatchupLoading ? (
+                                  <CircularProgress size={10} />
+                                ) : (
+                                  submission.losses
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </Grid>
               </Grid>
-            </Grid>
-          )}
-          {isLoading && <CircularProgress />}
-          {!isLoading && badgeRiddles.length > 0 && selectedRiddleId && (
-            <Grid container>
-              <Grid item xs={12} className={classes.submissionHeader}>
-                <Typography variant={"h4"}>Submissions</Typography>
-                <Button variant="outlined" onClick={handleRefreshClick}>
-                  Refresh
-                </Button>
-              </Grid>
-              <Grid item xs={12} className={classes.submissionOverview}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Total Submissions</TableCell>
-                      <TableCell>Total Votes</TableCell>
-                      <TableCell>Avg Num Matchups</TableCell>
-                      <TableCell>Num Undefeated</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {/* {badgeRiddles.find(br => br.riddle.id ===  selectedRiddleId)} */}
-                  </TableBody>
-                </Table>
-              </Grid>
-              <Grid item xs={12} className={classes.table}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Ranking</TableCell>
-                      <TableCell>Team Name</TableCell>
-                      <TableCell>Elo Rating</TableCell>
-                      <TableCell>Media URL</TableCell>
-                      <TableCell>Wins</TableCell>
-                      <TableCell>Losses</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {badgeRiddles
-                      .find(br => br.riddle.id === selectedRiddleId)
-                      ?.submissions?.map((submission, index) => {
-                        return (
-                          <TableRow>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell>
-                              {submission.solvedRiddle.teamId}
-                            </TableCell>
-                            <TableCell>{submission.eloScore}</TableCell>
-                            <TableCell>
-                              <IconButton
-                                onClick={() => {
-                                  handlePlayIconClick(
-                                    submission.solvedRiddle.mediaUrl
-                                  );
-                                }}
-                              >
-                                <PlayCircleOutlineIcon />
-                              </IconButton>
-                            </TableCell>
-                            <TableCell>
-                              {isMatchupLoading ? (
-                                <CircularProgress size={10} />
-                              ) : (
-                                submission.wins
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {isMatchupLoading ? (
-                                <CircularProgress size={10} />
-                              ) : (
-                                submission.losses
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-              </Grid>
-            </Grid>
-          )}
-        </Grid>
-      </Paper>
-      <Modal
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-        }}
-      >
-        <div className={classes.modal}>
-          <video controls src={mediaUrl} />
-        </div>
-      </Modal>
-    </div>
+            )}
+          </Grid>
+        </Paper>
+        <Modal
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+          }}
+        >
+          <div className={classes.modal}>
+            <video controls src={mediaUrl} />
+          </div>
+        </Modal>
+      </div>
+    </ThemeProvider>
   );
 }
 
