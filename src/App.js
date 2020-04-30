@@ -20,6 +20,7 @@ import {
 import { createMuiTheme, ThemeProvider } from "@material-ui/core/styles";
 import { defaultTheme } from "./defaultTheme";
 import PlayCircleOutlineIcon from "@material-ui/icons/PlayCircleOutline";
+import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
 
 function App() {
   const proxyUrl = "https://cors-anywhere.herokuapp.com/";
@@ -38,6 +39,7 @@ function App() {
   const [isMatchupLoading, setIsMatchupLoading] = React.useState(false);
   const [isTeamLoading, setIsTeamLoading] = React.useState(false);
   const [isUrlLoading, setIsUrlLoading] = React.useState(false);
+
   const [modalOpen, setModalOpen] = React.useState(false);
   const [mediaUrl, setMediaUrl] = React.useState("");
   const theme = createMuiTheme(defaultTheme);
@@ -51,6 +53,7 @@ function App() {
     paper: {
       padding: "16px"
     },
+    errorIcon: { color: "red" },
     header: {
       display: "flex",
       alignContent: "center",
@@ -65,6 +68,12 @@ function App() {
       justifyContent: "space-between"
     },
     table: {},
+    badgeName: {
+      fontWeight: "bold"
+    },
+    validatedIcon: {
+      color: "green"
+    },
     badgeInfo: {
       cursor: "pointer",
       display: "flex",
@@ -77,8 +86,8 @@ function App() {
       backgroundColor: "pink"
     },
     icon: {
-      width: "40px",
-      height: "auto"
+      height: "70px",
+      width: "auto"
     },
     textContainer: {
       display: "flex",
@@ -188,7 +197,6 @@ function App() {
   const handleBadgeClick = riddleId => {
     setSelectedRiddleId(riddleId);
     fetchMatchupsForRiddleId(riddleId);
-    // checkAllUrls();
   };
 
   const fetchMatchupsForRiddleId = riddleId => {
@@ -263,16 +271,22 @@ function App() {
   const checkUrl = url => {
     var http = new XMLHttpRequest();
 
-    http.open("HEAD", url, false);
+    http.open("HEAD", proxyUrl + url, false);
     http.send();
 
     return http.status != 404 && http.status != 403;
   };
 
-  const checkAllUrls = () => {
+  const checkAllUrls = (brs = badgeRiddles) => {
     setIsUrlLoading(true);
-    let mappedBadgeRiddles = badgeRiddles.map(br => {
+    let mappedBadgeRiddles = brs.map(br => {
+      if (br.riddle.id !== selectedRiddleId) {
+        return br;
+      }
       let mappedSubmissions = br.submissions.map(sub => {
+        if (sub.isVideoReachable === true || sub.isVideoReachable === false) {
+          return sub;
+        }
         const isVideoReachable = checkUrl(sub.solvedRiddle.mediaUrl);
         return {
           ...sub,
@@ -286,6 +300,17 @@ function App() {
     });
     setBadgeRiddles(mappedBadgeRiddles);
     setIsUrlLoading(false);
+  };
+
+  const handleValidateButtonClick = () => {
+    validateMedia();
+  };
+
+  const validateMedia = (brs = badgeRiddles) => {
+    setIsUrlLoading(true);
+    setTimeout(() => {
+      checkAllUrls(brs);
+    }, 300);
   };
 
   return (
@@ -322,7 +347,9 @@ function App() {
                         }}
                       >
                         <img className={classes.icon} src={br.image} />
-                        <Typography>{br.name}</Typography>
+                        <Typography className={classes.badgeName}>
+                          {br.name}
+                        </Typography>
                         <div className={classes.textContainer}>
                           <Typography># Subs: </Typography>
                           {isSubmissionLoading ? (
@@ -357,14 +384,20 @@ function App() {
               <Grid container>
                 <Grid item xs={12} className={classes.submissionHeader}>
                   <Typography variant={"h4"}>Submissions</Typography>
+                  <Button
+                    variant="outlined"
+                    onClick={handleValidateButtonClick}
+                  >
+                    Validate Media
+                  </Button>
                 </Grid>
                 <Grid item xs={12} className={classes.table}>
                   <Table>
                     <TableHead>
                       <TableRow>
                         <TableCell>Ranking</TableCell>
-                        <TableCell>Team Name</TableCell>
                         <TableCell>Team Image</TableCell>
+                        <TableCell>Team Name</TableCell>
                         <TableCell>Elo Rating</TableCell>
                         <TableCell>Media URL</TableCell>
                         <TableCell>Wins</TableCell>
@@ -376,14 +409,8 @@ function App() {
                         .find(br => br.riddle.id === selectedRiddleId)
                         ?.submissions?.map((submission, index) => {
                           return (
-                            <TableRow>
+                            <TableRow key={submission.id}>
                               <TableCell>{index + 1}</TableCell>
-                              <TableCell>
-                                {teams?.find(
-                                  team =>
-                                    team.id === submission.solvedRiddle.teamId
-                                )?.name || "<Team Deleted>"}
-                              </TableCell>
                               <TableCell>
                                 <img
                                   className={classes.teamImage}
@@ -396,12 +423,32 @@ function App() {
                                   }
                                 />
                               </TableCell>
+                              <TableCell>
+                                {teams?.find(
+                                  team =>
+                                    team.id === submission.solvedRiddle.teamId
+                                )?.name || "<Team Deleted>"}
+                              </TableCell>
                               <TableCell>{submission.eloScore}</TableCell>
                               <TableCell>
-                                {/* {isUrlLoading ? (
+                                {isUrlLoading ? (
                                   <CircularProgress size={10} />
-                                ) : submission.isVideoReachable ? (
+                                ) : submission.isVideoReachable === false ? (
                                   <IconButton
+                                    onClick={() => {
+                                      handlePlayIconClick(
+                                        submission.solvedRiddle.mediaUrl
+                                      );
+                                    }}
+                                  >
+                                    <ErrorOutlineIcon
+                                      className={classes.errorIcon}
+                                    />
+                                  </IconButton>
+                                ) : (
+                                  <IconButton
+                                    className={`${submission.isVideoReachable ===
+                                      true && classes.validatedIcon}`}
                                     onClick={() => {
                                       handlePlayIconClick(
                                         submission.solvedRiddle.mediaUrl
@@ -410,10 +457,8 @@ function App() {
                                   >
                                     <PlayCircleOutlineIcon />
                                   </IconButton>
-                                ) : (
-                                  "X"
-                                )} */}
-                                <IconButton
+                                )}
+                                {/* <IconButton
                                   onClick={() => {
                                     handlePlayIconClick(
                                       submission.solvedRiddle.mediaUrl
@@ -421,7 +466,7 @@ function App() {
                                   }}
                                 >
                                   <PlayCircleOutlineIcon />
-                                </IconButton>
+                                </IconButton> */}
                               </TableCell>
                               <TableCell>
                                 {isMatchupLoading ? (
