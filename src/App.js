@@ -37,7 +37,7 @@ function App() {
   const [isSubmissionLoading, setIsSubmissionLoading] = React.useState(false);
   const [isMatchupLoading, setIsMatchupLoading] = React.useState(false);
   const [isTeamLoading, setIsTeamLoading] = React.useState(false);
-
+  const [isUrlLoading, setIsUrlLoading] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [mediaUrl, setMediaUrl] = React.useState("");
   const theme = createMuiTheme(defaultTheme);
@@ -160,7 +160,6 @@ function App() {
                 averageNumMatchups: average,
                 voteTotal: total
               };
-
               setBadgeRiddles(
                 mappedBadges.filter(badge => badge !== undefined)
               );
@@ -171,12 +170,11 @@ function App() {
               console.log("Error fetching submission data:", err);
             });
         }
-
         setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
         setIsLoading(false);
       })
       .catch(error => {
-        console.log("ERROR FETCHING : ", error);
+        console.log("ERROR FETCHING BADGE DATA: ", error);
         setIsLoading(false);
       });
   };
@@ -190,6 +188,7 @@ function App() {
   const handleBadgeClick = riddleId => {
     setSelectedRiddleId(riddleId);
     fetchMatchupsForRiddleId(riddleId);
+    // checkAllUrls();
   };
 
   const fetchMatchupsForRiddleId = riddleId => {
@@ -219,8 +218,8 @@ function App() {
             submissions: mappedSubmissions
           };
         });
-        setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
         setIsMatchupLoading(false);
+        setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
       })
       .catch(err => {
         setIsMatchupLoading(false);
@@ -259,6 +258,34 @@ function App() {
     if (e.key === "Enter") {
       handleEventIdButtonClick();
     }
+  };
+
+  const checkUrl = url => {
+    var http = new XMLHttpRequest();
+
+    http.open("HEAD", url, false);
+    http.send();
+
+    return http.status != 404 && http.status != 403;
+  };
+
+  const checkAllUrls = () => {
+    setIsUrlLoading(true);
+    let mappedBadgeRiddles = badgeRiddles.map(br => {
+      let mappedSubmissions = br.submissions.map(sub => {
+        const isVideoReachable = checkUrl(sub.solvedRiddle.mediaUrl);
+        return {
+          ...sub,
+          isVideoReachable
+        };
+      });
+      return {
+        ...br,
+        submissions: mappedSubmissions
+      };
+    });
+    setBadgeRiddles(mappedBadgeRiddles);
+    setIsUrlLoading(false);
   };
 
   return (
@@ -352,12 +379,10 @@ function App() {
                             <TableRow>
                               <TableCell>{index + 1}</TableCell>
                               <TableCell>
-                                {
-                                  teams?.find(
-                                    team =>
-                                      team.id === submission.solvedRiddle.teamId
-                                  )?.name
-                                }
+                                {teams?.find(
+                                  team =>
+                                    team.id === submission.solvedRiddle.teamId
+                                )?.name || "<Team Deleted>"}
                               </TableCell>
                               <TableCell>
                                 <img
@@ -373,6 +398,21 @@ function App() {
                               </TableCell>
                               <TableCell>{submission.eloScore}</TableCell>
                               <TableCell>
+                                {/* {isUrlLoading ? (
+                                  <CircularProgress size={10} />
+                                ) : submission.isVideoReachable ? (
+                                  <IconButton
+                                    onClick={() => {
+                                      handlePlayIconClick(
+                                        submission.solvedRiddle.mediaUrl
+                                      );
+                                    }}
+                                  >
+                                    <PlayCircleOutlineIcon />
+                                  </IconButton>
+                                ) : (
+                                  "X"
+                                )} */}
                                 <IconButton
                                   onClick={() => {
                                     handlePlayIconClick(
