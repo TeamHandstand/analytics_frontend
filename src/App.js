@@ -117,7 +117,7 @@ function App() {
               const total = json.submissions.reduce(
                 (acc, c) => acc + c.numScoredMatchups,
                 0
-              );
+              )/2;
 
               const average = (total / json.submissions.length).toFixed(1);
               mappedBadges[badge] = {
