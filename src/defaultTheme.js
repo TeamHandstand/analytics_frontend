@@ -14,6 +14,9 @@ export const defaultTheme = {
     MuiTableCell: {
       root: {
         padding: "4px"
+      },
+      head: {
+        fontWeight: "bold"
       }
     }
   }

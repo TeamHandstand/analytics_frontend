@@ -15,12 +15,16 @@ import {
   TableCell,
   CircularProgress,
   Modal,
-  IconButton
+  IconButton,
+  Snackbar,
+  SnackbarContent
 } from "@material-ui/core";
 import { createMuiTheme, ThemeProvider } from "@material-ui/core/styles";
 import { defaultTheme } from "./defaultTheme";
 import PlayCircleOutlineIcon from "@material-ui/icons/PlayCircleOutline";
 import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
+import InfoIcon from "@material-ui/icons/Info";
+import WarningIcon from "@material-ui/icons/Warning";
 
 function App() {
   const proxyUrl = "https://cors-anywhere.herokuapp.com/";
@@ -33,14 +37,21 @@ function App() {
   const [selectedRiddleId, setSelectedRiddleId] = React.useState("");
   const [badgeRiddles, setBadgeRiddles] = React.useState([]);
   const [teams, setTeams] = React.useState([]);
+  const [selectedSubmission, setSelectedSubmission] = React.useState({});
+  const [snackbarContent, setSnackbarContent] = React.useState("");
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSubmissionLoading, setIsSubmissionLoading] = React.useState(false);
   const [isMatchupLoading, setIsMatchupLoading] = React.useState(false);
   const [isTeamLoading, setIsTeamLoading] = React.useState(false);
   const [isUrlLoading, setIsUrlLoading] = React.useState(false);
+  const [isActiveLoading, setIsActiveLoading] = React.useState(false);
 
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [detailModalOpen, setDetailModalOpen] = React.useState(false);
+  const [activeModalOpen, setActiveModalOpen] = React.useState(false);
+  const [snackbarOpen, setSnackbarOpen] = React.useState(false);
+
   const [mediaUrl, setMediaUrl] = React.useState("");
   const theme = createMuiTheme(defaultTheme);
 
@@ -98,6 +109,19 @@ function App() {
       width: "30px",
       height: "auto"
     },
+    activeCircle: {
+      background:
+        "radial-gradient(circle, rgba(130, 255, 147, 1) 3%, rgba(6, 172, 20, 1) 84%)",
+      borderRadius: "50%",
+      height: "30px",
+      width: "30px",
+      cursor: "pointer"
+    },
+    background:
+      "radial-gradient(circle, rgba(255, 130, 130, 1) 3%, rgba(172, 6, 6, 1) 84%)",
+    nonActiveCircle: {
+      boxShadow: "none"
+    },
     modal: {
       position: "absolute",
       width: "70vw",
@@ -110,7 +134,14 @@ function App() {
       padding: theme.spacing(2, 4, 3),
       display: "flex",
       justifyContent: "center",
-      alignItems: "center"
+      alignItems: "center",
+      flexDirection: "column"
+    },
+    confirmActiveButton: {
+      borderColor: selectedSubmission.active === false ? "green" : "red"
+    },
+    errorSnack: {
+      color: theme.palette.error.dark
     }
   });
   const classes = useStyles();
@@ -174,9 +205,11 @@ function App() {
               );
               setIsSubmissionLoading(false);
             })
-            .catch(err => {
+            .catch(error => {
               setIsSubmissionLoading(false);
-              console.log("Error fetching submission data:", err);
+              console.log("Error fetching submission data:", error);
+              setSnackbarContent(error.toString());
+              setSnackbarOpen(true);
             });
         }
         setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
@@ -184,6 +217,8 @@ function App() {
       })
       .catch(error => {
         console.log("ERROR FETCHING BADGE DATA: ", error);
+        setSnackbarContent(error.toString());
+        setSnackbarOpen(true);
         setIsLoading(false);
       });
   };
@@ -208,7 +243,7 @@ function App() {
       .then(res => res.json())
       .then(json => {
         let mappedBadges = badgeRiddles.map(br => {
-          let mappedSubmissions = br.submissions.map(sub => {
+          let mappedSubmissions = br?.submissions.map(sub => {
             const wins = json.matchups.filter(
               matchup => matchup.winningSubmissionId === sub.id
             ).length;
@@ -229,9 +264,11 @@ function App() {
         setIsMatchupLoading(false);
         setBadgeRiddles(mappedBadges.filter(badge => badge !== undefined));
       })
-      .catch(err => {
+      .catch(error => {
         setIsMatchupLoading(false);
-        console.log("Error fetching matchup data:", err);
+        console.log("Error fetching matchup data:", error);
+        setSnackbarContent(error.toString());
+        setSnackbarOpen(true);
       });
   };
 
@@ -247,9 +284,11 @@ function App() {
         setTeams(json.teams);
         setIsTeamLoading(false);
       })
-      .catch(err => {
+      .catch(error => {
         setIsTeamLoading(false);
-        console.log("Error fetching team data:", err);
+        console.log("Error fetching team data:", error);
+        setSnackbarContent(error.toString());
+        setSnackbarOpen(true);
       });
   };
 
@@ -313,6 +352,59 @@ function App() {
     }, 300);
   };
 
+  const handleActiveCircleClick = submission => {
+    setSelectedSubmission(submission);
+    setActiveModalOpen(true);
+  };
+
+  const handleDetailModalButtonClick = submission => {
+    setSelectedSubmission(submission);
+    setDetailModalOpen(true);
+  };
+
+  const handleConfirmActiveButtonClick = () => {
+    setIsActiveLoading(true);
+    const url = `https://api.handstandwith.us/v2/events/${eventId}/event_riddles/${
+      selectedSubmission.solvedRiddle.eventRiddleId
+    }/submissions/${selectedSubmission.id}/${
+      selectedSubmission.active === false ? "activate" : "deactivate"
+    }`;
+    fetch(proxyUrl + url, {
+      headers
+    })
+      .then(res => res.json())
+      .then(json => {
+        let mappedBadgeRiddles = badgeRiddles.map(br => {
+          let mappedSubmissions = br.submissions.map(sub => {
+            if (sub.id !== selectedSubmission.id) {
+              return sub;
+            }
+            return {
+              ...sub,
+              active: !sub.active
+            };
+          });
+          return {
+            ...br,
+            submissions: mappedSubmissions
+          };
+        });
+        setBadgeRiddles(mappedBadgeRiddles);
+        setIsActiveLoading(false);
+        setActiveModalOpen(false);
+      })
+      .catch(error => {
+        setIsActiveLoading(false);
+        console.log("Error activating/deactivating data:", error);
+        setSnackbarContent(error.toString());
+        setSnackbarOpen(true);
+      });
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <div className={classes.container}>
@@ -339,6 +431,7 @@ function App() {
                   {badgeRiddles.map(br => {
                     return (
                       <Grid
+                        key={br.riddle.id}
                         item
                         className={`${classes.badgeInfo} ${br?.riddle?.id ===
                           selectedRiddleId && classes.selectedBadge}`}
@@ -396,12 +489,15 @@ function App() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Ranking</TableCell>
+                        <TableCell>Info</TableCell>
                         <TableCell>Team Image</TableCell>
                         <TableCell>Team Name</TableCell>
                         <TableCell>Elo Rating</TableCell>
+                        <TableCell>Points Awarded</TableCell>
                         <TableCell>Media URL</TableCell>
                         <TableCell>Wins</TableCell>
                         <TableCell>Losses</TableCell>
+                        <TableCell>Active</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -411,6 +507,15 @@ function App() {
                           return (
                             <TableRow key={submission.id}>
                               <TableCell>{index + 1}</TableCell>
+                              <TableCell>
+                                <IconButton
+                                  onClick={() => {
+                                    handleDetailModalButtonClick(submission);
+                                  }}
+                                >
+                                  <InfoIcon />
+                                </IconButton>
+                              </TableCell>
                               <TableCell>
                                 <img
                                   className={classes.teamImage}
@@ -430,6 +535,9 @@ function App() {
                                 )?.name || "<Team Deleted>"}
                               </TableCell>
                               <TableCell>{submission.eloScore}</TableCell>
+                              <TableCell>
+                                {submission.solvedRiddle.pointsAwarded}
+                              </TableCell>
                               <TableCell>
                                 {isUrlLoading ? (
                                   <CircularProgress size={10} />
@@ -458,15 +566,6 @@ function App() {
                                     <PlayCircleOutlineIcon />
                                   </IconButton>
                                 )}
-                                {/* <IconButton
-                                  onClick={() => {
-                                    handlePlayIconClick(
-                                      submission.solvedRiddle.mediaUrl
-                                    );
-                                  }}
-                                >
-                                  <PlayCircleOutlineIcon />
-                                </IconButton> */}
                               </TableCell>
                               <TableCell>
                                 {isMatchupLoading ? (
@@ -481,6 +580,20 @@ function App() {
                                 ) : (
                                   submission.losses
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                <IconButton
+                                  onClick={() => {
+                                    handleActiveCircleClick(submission);
+                                  }}
+                                >
+                                  <div
+                                    className={`${
+                                      classes.activeCircle
+                                    } ${submission.active === false &&
+                                      classes.nonActiveCircle}`}
+                                  />
+                                </IconButton>
                               </TableCell>
                             </TableRow>
                           );
@@ -502,6 +615,57 @@ function App() {
             <video controls src={mediaUrl} />
           </div>
         </Modal>
+        <Modal
+          open={detailModalOpen}
+          onClose={() => {
+            setDetailModalOpen(false);
+          }}
+        >
+          <div className={classes.modal}>
+            <Typography variant="h4">ID: {selectedSubmission.id}</Typography>
+            <div>{JSON.stringify(selectedSubmission, undefined, 8)}</div>
+          </div>
+        </Modal>
+        <Modal
+          open={activeModalOpen}
+          onClose={() => {
+            setActiveModalOpen(false);
+          }}
+        >
+          <div className={classes.modal}>
+            <Typography variant="h5">
+              Are you sure you want to{" "}
+              {selectedSubmission.active === false ? "activate" : "deactivate"}{" "}
+              this submission?
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={handleConfirmActiveButtonClick}
+              className={classes.confirmActiveButton}
+            >
+              {isActiveLoading ? <CircularProgress /> : "Confirm"}
+            </Button>
+          </div>
+        </Modal>
+        <Snackbar
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "left"
+          }}
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleSnackbarClose}
+        >
+          <SnackbarContent
+            className={classes.errorSnack}
+            message={
+              <span id="client-snackbar" className={classes.message}>
+                <WarningIcon />
+                {snackbarContent}
+              </span>
+            }
+          />
+        </Snackbar>
       </div>
     </ThemeProvider>
   );
