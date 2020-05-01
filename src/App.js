@@ -117,10 +117,9 @@ function App() {
       width: "30px",
       cursor: "pointer"
     },
-    background:
-      "radial-gradient(circle, rgba(255, 130, 130, 1) 3%, rgba(172, 6, 6, 1) 84%)",
     nonActiveCircle: {
-      boxShadow: "none"
+      background:
+        "radial-gradient(circle, rgba(255, 130, 130, 1) 3%, rgba(172, 6, 6, 1) 84%)"
     },
     modal: {
       position: "absolute",
@@ -370,7 +369,8 @@ function App() {
       selectedSubmission.active === false ? "activate" : "deactivate"
     }`;
     fetch(proxyUrl + url, {
-      headers
+      headers,
+      method: "PUT"
     })
       .then(res => res.json())
       .then(json => {
